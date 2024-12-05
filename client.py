@@ -2,7 +2,7 @@ import socket
 import threading
 import rsa
 import json
-import os  # Import added for IV generation in AES
+import os  
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
@@ -15,7 +15,7 @@ RSA_KEY_SIZE = 2048
 
 # AES encryption and decryption helper functions
 def aes_encrypt(key, plaintext):
-    iv = os.urandom(16)  # Initialization vector for AES
+    iv = os.urandom(16) 
     cipher = Cipher(algorithms.AES(b64decode(key)), modes.CBC(iv), backend=default_backend())
     encryptor = cipher.encryptor()
     padder = padding.PKCS7(algorithms.AES.block_size).padder()
@@ -26,7 +26,7 @@ def aes_encrypt(key, plaintext):
 
 def aes_decrypt(key, ciphertext):
     decoded_data = b64decode(ciphertext)
-    iv = decoded_data[:16]  # Extract initialization vector
+    iv = decoded_data[:16]  
     encrypted_message = decoded_data[16:]
     cipher = Cipher(algorithms.AES(b64decode(key)), modes.CBC(iv), backend=default_backend())
     decryptor = cipher.decryptor()
@@ -34,8 +34,6 @@ def aes_decrypt(key, ciphertext):
     padded_data = decryptor.update(encrypted_message) + decryptor.finalize()
     return unpadder.update(padded_data) + unpadder.finalize()
 
-
-# Load or initialize user data
 def load_users():
     try:
         with open(USER_FILE, "r") as f:
