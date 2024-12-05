@@ -10,12 +10,32 @@ from cryptography.hazmat.backends import default_backend
 
 USER_FILE = "users.json"
 CHAT_LOGS_DIR = "chat_logs"
+DES_KEY_FILE = "des_key.txt"  # File to store the DES key
 RSA_KEY_SIZE = 2048
-DES_KEY = b64encode(os.urandom(8)).decode()  # Generate a single DES key (8 bytes)
 
 client_sockets = {}  # Dictionary to store client sockets with usernames
 aes_keys = {}  # Store AES session keys for each client
 server_running = True  # Server status flag
+
+
+# Save DES key for consistent encryption/decryption
+def save_des_key(key):
+    with open(DES_KEY_FILE, "w") as f:
+        f.write(key)
+
+
+# Load DES key or generate a new one
+def load_des_key():
+    if os.path.exists(DES_KEY_FILE):
+        with open(DES_KEY_FILE, "r") as f:
+            return f.read()
+    else:
+        key = b64encode(os.urandom(8)).decode()
+        save_des_key(key)
+        return key
+
+
+DES_KEY = load_des_key()  # Load or generate DES key
 
 
 # AES encryption and decryption helper functions
@@ -52,14 +72,18 @@ def des_encrypt(key, plaintext):
 
 
 def des_decrypt(key, ciphertext):
-    decoded_data = b64decode(ciphertext)
-    iv = decoded_data[:8]  # Extract initialization vector
-    encrypted_message = decoded_data[8:]
-    cipher = Cipher(algorithms.TripleDES(b64decode(key)), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    unpadder = padding.PKCS7(algorithms.TripleDES.block_size).unpadder()
-    padded_data = decryptor.update(encrypted_message) + decryptor.finalize()
-    return unpadder.update(padded_data) + unpadder.finalize()
+    try:
+        decoded_data = b64decode(ciphertext)
+        iv = decoded_data[:8]  # Extract initialization vector
+        encrypted_message = decoded_data[8:]
+        cipher = Cipher(algorithms.TripleDES(b64decode(key)), modes.CBC(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+        unpadder = padding.PKCS7(algorithms.TripleDES.block_size).unpadder()
+        padded_data = decryptor.update(encrypted_message) + decryptor.finalize()
+        return unpadder.update(padded_data) + unpadder.finalize()
+    except Exception as e:
+        print(f"Error decrypting message: {e}")
+        raise ValueError("Decryption failed due to padding issues or invalid ciphertext.")
 
 
 # Load or initialize user data
@@ -152,8 +176,11 @@ def server_commands(server_socket):
                 with open(filepath, "r") as log_file:
                     print(f"\nContents of {filename}:\n")
                     for line in log_file:
-                        decrypted_line = des_decrypt(DES_KEY, line.strip())
-                        print(decrypted_line.decode())
+                        try:
+                            decrypted_line = des_decrypt(DES_KEY, line.strip())
+                            print(decrypted_line.decode())
+                        except ValueError:
+                            print("[ERROR] Could not decrypt line. Data may be corrupted.")
             else:
                 print(f"Chat log {filename} not found.")
         else:
